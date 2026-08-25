@@ -49,9 +49,8 @@
     padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
   }
   .brand{color:var(--white); font-size:20px; display:flex; align-items:center; gap:10px;}
-  .brand-mark{
-    width:32px; height:32px; background:var(--orange); border-radius:4px;
-    display:flex; align-items:center; justify-content:center; color:var(--black); font-weight:700; font-size:14px;
+.brand-mark{
+    height:44px; width:auto; border-radius:4px;
   }
   .tagline{color:var(--grey); font-size:11px; font-family:'Inter',sans-serif; text-transform:none; letter-spacing:0;}
 
@@ -139,7 +138,7 @@
 <div id="app">
   <header>
     <div class="brand">
-      <div class="brand-mark">UB</div>
+      <img src="logo.jpg" alt="Utility Bucket" class="brand-mark">
       <div>
         Utility Bucket
         <div class="tagline">It's not just a bucket — Operations</div>
@@ -319,7 +318,7 @@
 // ---------- CONFIG ----------
 const SUPABASE_URL = 'https://mvaizrbwdywpddajnxoq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_1eadPiHUbPqkhNZW0ASmSA_ItnsJIZt';
-const APP_PIN = '1234'; // change this to whatever PIN you want
+const APP_PIN = '2577'; // change this to whatever PIN you want
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
