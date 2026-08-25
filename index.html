@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Utility Bucket — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --black:#0a0a0a;
+    --panel:#151515;
+    --panel2:#1e1e1e;
+    --orange:#FF5A00;
+    --orange-dim:#7a2c00;
+    --white:#f5f5f5;
+    --grey:#8a8a8a;
+    --grey-line:#2a2a2a;
+    --danger:#e5484d;
+    --success:#2ecc71;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--black); color:var(--white);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.brand,.tab-btn,.stat-label,.section-title{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.03em;}
+
+  /* PIN screen */
+  #pinScreen{
+    position:fixed; inset:0; background:var(--black);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:999;
+  }
+  #pinScreen h1{color:var(--orange); font-size:28px; margin-bottom:4px;}
+  #pinScreen p{color:var(--grey); margin-top:0; margin-bottom:24px; font-size:13px;}
+  #pinInput{
+    background:var(--panel); border:2px solid var(--grey-line); color:var(--white);
+    font-size:24px; text-align:center; letter-spacing:8px; padding:12px 16px; border-radius:6px; width:200px;
+  }
+  #pinInput:focus{outline:none; border-color:var(--orange);}
+  #pinError{color:var(--danger); font-size:13px; margin-top:10px; height:16px;}
+
+  /* App shell */
+  #app{display:none;}
+  header{
+    background:var(--panel); border-bottom:3px solid var(--orange);
+    padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{color:var(--white); font-size:20px; display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:32px; height:32px; background:var(--orange); border-radius:4px;
+    display:flex; align-items:center; justify-content:center; color:var(--black); font-weight:700; font-size:14px;
+  }
+  .tagline{color:var(--grey); font-size:11px; font-family:'Inter',sans-serif; text-transform:none; letter-spacing:0;}
+
+  nav{
+    display:flex; gap:4px; background:var(--panel); padding:0 24px; border-bottom:1px solid var(--grey-line);
+    overflow-x:auto;
+  }
+  .tab-btn{
+    background:none; border:none; color:var(--grey); padding:14px 18px; font-size:13px;
+    cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;
+  }
+  .tab-btn:hover{color:var(--white);}
+  .tab-btn.active{color:var(--orange); border-bottom-color:var(--orange);}
+
+  main{padding:24px; max-width:1200px; margin:0 auto;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+
+  .stats-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:28px;}
+  .stat-card{background:var(--panel); border:1px solid var(--grey-line); border-radius:8px; padding:18px; border-left:4px solid var(--orange);}
+  .stat-label{color:var(--grey); font-size:11px; margin-bottom:6px;}
+  .stat-value{font-size:30px; font-weight:600; font-family:'Oswald',sans-serif;}
+  .stat-sub{color:var(--grey); font-size:12px; margin-top:4px;}
+  .stat-card.warn{border-left-color:var(--danger);}
+  .stat-card.warn .stat-value{color:var(--danger);}
+
+  .section-title{font-size:16px; color:var(--white); margin:0 0 14px 0; display:flex; align-items:center; justify-content:space-between;}
+  .panel{background:var(--panel); border:1px solid var(--grey-line); border-radius:8px; padding:20px; margin-bottom:20px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; color:var(--grey); font-size:11px; text-transform:uppercase; letter-spacing:0.04em; padding:8px 10px; border-bottom:1px solid var(--grey-line);}
+  td{padding:10px; border-bottom:1px solid var(--grey-line); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:var(--panel2);}
+
+  .badge{padding:3px 10px; border-radius:20px; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; font-weight:600;}
+  .badge.pending{background:#3a2e00; color:#ffcc4d;}
+  .badge.packed{background:#00304a; color:#4db8ff;}
+  .badge.shipped{background:#003a1f; color:#4dff88;}
+  .badge.delivered{background:#0f3a00; color:#8aff4d;}
+  .badge.cancelled{background:#3a0000; color:#ff6b6b;}
+  .badge.draft{background:#2a2a2a; color:var(--grey);}
+  .badge.sent{background:#00304a; color:#4db8ff;}
+  .badge.paid{background:#0f3a00; color:#8aff4d;}
+
+  button.btn{
+    background:var(--orange); color:var(--black); border:none; padding:9px 18px;
+    border-radius:5px; font-weight:600; font-size:13px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  button.btn:hover{background:#ff7326;}
+  button.btn.secondary{background:var(--panel2); color:var(--white); border:1px solid var(--grey-line);}
+  button.btn.small{padding:5px 12px; font-size:12px;}
+  button.btn.danger{background:var(--danger); color:var(--white);}
+
+  input,select,textarea{
+    background:var(--panel2); border:1px solid var(--grey-line); color:var(--white);
+    padding:9px 12px; border-radius:5px; font-size:13px; font-family:'Inter',sans-serif; width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:none; border-color:var(--orange);}
+  label{font-size:12px; color:var(--grey); display:block; margin-bottom:5px; margin-top:12px;}
+  label:first-child{margin-top:0;}
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none;
+    align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .modal-overlay.active{display:flex;}
+  .modal{background:var(--panel); border:1px solid var(--grey-line); border-radius:8px; padding:24px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;}
+  .modal h3{margin-top:0; color:var(--orange);}
+  .modal-actions{display:flex; gap:10px; margin-top:20px; justify-content:flex-end;}
+
+  .empty-state{text-align:center; color:var(--grey); padding:40px 20px; font-size:13px;}
+  .row-actions{display:flex; gap:6px;}
+</style>
+</head>
+<body>
+
+<div id="pinScreen">
+  <h1>Utility Bucket</h1>
+  <p>Internal dashboard — enter PIN</p>
+  <input type="password" id="pinInput" maxlength="4" inputmode="numeric" autofocus>
+  <div id="pinError"></div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">UB</div>
+      <div>
+        Utility Bucket
+        <div class="tagline">It's not just a bucket — Operations</div>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="inventory">Inventory</button>
+    <button class="tab-btn" data-tab="orders">Orders</button>
+    <button class="tab-btn" data-tab="customers">Customers</button>
+    <button class="tab-btn" data-tab="invoicing">Invoicing</button>
+  </nav>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="stats-grid" id="dashStats"></div>
+      <div class="panel">
+        <div class="section-title">Recent Orders</div>
+        <table id="dashRecentOrders"><thead><tr><th>Order#</th><th>Customer</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <!-- INVENTORY -->
+    <div class="tab-content" id="tab-inventory">
+      <div class="panel">
+        <div class="section-title">
+          Stock
+          <button class="btn small" onclick="openInventoryEdit()">Update Stock</button>
+        </div>
+        <table id="inventoryTable"><thead><tr><th>SKU</th><th>Product</th><th>Total</th><th>Available</th><th>Low Stock At</th><th>Landed Cost</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="tab-content" id="tab-orders">
+      <div class="panel">
+        <div class="section-title">
+          Orders
+          <button class="btn small" onclick="openOrderModal()">+ New Order</button>
+        </div>
+        <table id="ordersTable"><thead><tr><th>Order#</th><th>Customer</th><th>Channel</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="tab-content" id="tab-customers">
+      <div class="panel">
+        <div class="section-title">
+          Customers
+          <button class="btn small" onclick="openCustomerModal()">+ New Customer</button>
+        </div>
+        <table id="customersTable"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <!-- INVOICING -->
+    <div class="tab-content" id="tab-invoicing">
+      <div class="panel">
+        <div class="section-title">
+          Invoices
+          <button class="btn small" onclick="openInvoiceModal()">+ New Invoice</button>
+        </div>
+        <table id="invoicesTable"><thead><tr><th>Invoice#</th><th>Customer</th><th>Subtotal</th><th>GST</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Order Modal -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal">
+    <h3>New Order</h3>
+    <label>Customer</label>
+    <select id="orderCustomer"></select>
+    <label>Channel</label>
+    <select id="orderChannel">
+      <option value="manual">Manual</option>
+      <option value="shopify">Shopify</option>
+      <option value="wholesale">Wholesale</option>
+    </select>
+    <label>Quantity</label>
+    <input type="number" id="orderQty" value="1" min="1">
+    <label>Unit Price ($)</label>
+    <input type="number" id="orderUnitPrice" step="0.01" placeholder="40.00">
+    <label>Shipping Cost ($)</label>
+    <input type="number" id="orderShipping" step="0.01" value="0">
+    <label>Shipping Method</label>
+    <input type="text" id="orderShipMethod" placeholder="Aramex / Local Delivery / Pickup">
+    <label>Status</label>
+    <select id="orderStatus">
+      <option value="pending">Pending</option>
+      <option value="packed">Packed</option>
+      <option value="shipped">Shipped</option>
+      <option value="delivered">Delivered</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <label>Notes</label>
+    <textarea id="orderNotes" rows="2"></textarea>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('orderModal')">Cancel</button>
+      <button class="btn" onclick="saveOrder()">Save Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal-overlay" id="customerModal">
+  <div class="modal">
+    <h3>New Customer</h3>
+    <label>Name</label>
+    <input type="text" id="custName">
+    <label>Email</label>
+    <input type="email" id="custEmail">
+    <label>Phone</label>
+    <input type="text" id="custPhone">
+    <label>Address</label>
+    <textarea id="custAddress" rows="2"></textarea>
+    <label>Notes</label>
+    <textarea id="custNotes" rows="2"></textarea>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('customerModal')">Cancel</button>
+      <button class="btn" onclick="saveCustomer()">Save Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal-overlay" id="invoiceModal">
+  <div class="modal">
+    <h3>New Invoice</h3>
+    <label>Customer</label>
+    <select id="invCustomer"></select>
+    <label>Link to Order (optional)</label>
+    <select id="invOrder"><option value="">— None —</option></select>
+    <label>Subtotal (ex GST, $)</label>
+    <input type="number" id="invSubtotal" step="0.01" oninput="calcInvoiceTotal()">
+    <label>Due Date</label>
+    <input type="date" id="invDueDate">
+    <label>Notes</label>
+    <textarea id="invNotes" rows="2"></textarea>
+    <div style="margin-top:14px; padding:12px; background:var(--panel2); border-radius:5px; font-size:13px;">
+      GST (10%): $<span id="invGstDisplay">0.00</span><br>
+      <strong>Total: $<span id="invTotalDisplay">0.00</span></strong>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('invoiceModal')">Cancel</button>
+      <button class="btn" onclick="saveInvoice()">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inventory Edit Modal -->
+<div class="modal-overlay" id="inventoryModal">
+  <div class="modal">
+    <h3>Update Stock</h3>
+    <label>Total Units</label>
+    <input type="number" id="invTotalUnits">
+    <label>Available Units</label>
+    <input type="number" id="invAvailUnits">
+    <label>Low Stock Threshold</label>
+    <input type="number" id="invLowStock">
+    <label>Landed Cost per Unit ($)</label>
+    <input type="number" id="invLandedCost" step="0.01">
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('inventoryModal')">Cancel</button>
+      <button class="btn" onclick="saveInventory()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- CONFIG ----------
+const SUPABASE_URL = 'https://mvaizrbwdywpddajnxoq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_1eadPiHUbPqkhNZW0ASmSA_ItnsJIZt';
+const APP_PIN = '1234'; // change this to whatever PIN you want
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------- PIN GATE ----------
+const pinInput = document.getElementById('pinInput');
+pinInput.addEventListener('input', () => {
+  if(pinInput.value.length === APP_PIN.length){
+    if(pinInput.value === APP_PIN){
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      initApp();
+    } else {
+      document.getElementById('pinError').textContent = 'Incorrect PIN';
+      pinInput.value = '';
+    }
+  }
+});
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+function fmt(n){ return Number(n||0).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+let customersCache = [];
+let ordersCache = [];
+let inventoryCache = null;
+
+// ---------- INIT ----------
+async function initApp(){
+  await loadCustomers();
+  await loadInventory();
+  await loadOrders();
+  await loadInvoices();
+  renderDashboard();
+}
+
+// ---------- CUSTOMERS ----------
+async function loadCustomers(){
+  const {data, error} = await sb.from('ub_customers').select('*').order('created_at',{ascending:false});
+  if(error){ console.error(error); return; }
+  customersCache = data || [];
+  renderCustomers();
+  populateCustomerDropdowns();
+}
+
+function renderCustomers(){
+  const tbody = document.querySelector('#customersTable tbody');
+  if(!customersCache.length){
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No customers yet — add your first one</td></tr>';
+    return;
+  }
+  tbody.innerHTML = customersCache.map(c=>{
+    const orderCount = ordersCache.filter(o=>o.customer_id===c.id).length;
+    return `<tr>
+      <td>${c.name}</td>
+      <td>${c.email||'—'}</td>
+      <td>${c.phone||'—'}</td>
+      <td>${orderCount}</td>
+      <td class="row-actions"><button class="btn small danger" onclick="deleteCustomer('${c.id}')">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function populateCustomerDropdowns(){
+  const opts = customersCache.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('orderCustomer').innerHTML = opts || '<option value="">Add a customer first</option>';
+  document.getElementById('invCustomer').innerHTML = opts || '<option value="">Add a customer first</option>';
+}
+
+function openCustomerModal(){
+  document.getElementById('custName').value='';
+  document.getElementById('custEmail').value='';
+  document.getElementById('custPhone').value='';
+  document.getElementById('custAddress').value='';
+  document.getElementById('custNotes').value='';
+  document.getElementById('customerModal').classList.add('active');
+}
+
+async function saveCustomer(){
+  const name = document.getElementById('custName').value.trim();
+  if(!name){ alert('Name is required'); return; }
+  const {error} = await sb.from('ub_customers').insert({
+    name,
+    email: document.getElementById('custEmail').value.trim() || null,
+    phone: document.getElementById('custPhone').value.trim() || null,
+    address: document.getElementById('custAddress').value.trim() || null,
+    notes: document.getElementById('custNotes').value.trim() || null
+  });
+  if(error){ alert('Error: '+error.message); return; }
+  closeModal('customerModal');
+  await loadCustomers();
+  renderDashboard();
+}
+
+async function deleteCustomer(id){
+  if(!confirm('Delete this customer?')) return;
+  await sb.from('ub_customers').delete().eq('id', id);
+  await loadCustomers();
+}
+
+// ---------- INVENTORY ----------
+async function loadInventory(){
+  const {data, error} = await sb.from('ub_inventory').select('*').limit(1).single();
+  if(error){ console.error(error); return; }
+  inventoryCache = data;
+  renderInventory();
+}
+
+function renderInventory(){
+  const tbody = document.querySelector('#inventoryTable tbody');
+  if(!inventoryCache){ tbody.innerHTML='<tr><td colspan="6" class="empty-state">No inventory record found</td></tr>'; return; }
+  const i = inventoryCache;
+  tbody.innerHTML = `<tr>
+    <td>${i.sku}</td>
+    <td>${i.name}</td>
+    <td>${i.quantity_total}</td>
+    <td style="color:${i.quantity_available<=i.low_stock_threshold?'var(--danger)':'var(--white)'}">${i.quantity_available}</td>
+    <td>${i.low_stock_threshold}</td>
+    <td>$${fmt(i.landed_cost)}</td>
+  </tr>`;
+}
+
+function openInventoryEdit(){
+  if(!inventoryCache) return;
+  document.getElementById('invTotalUnits').value = inventoryCache.quantity_total;
+  document.getElementById('invAvailUnits').value = inventoryCache.quantity_available;
+  document.getElementById('invLowStock').value = inventoryCache.low_stock_threshold;
+  document.getElementById('invLandedCost').value = inventoryCache.landed_cost;
+  document.getElementById('inventoryModal').classList.add('active');
+}
+
+async function saveInventory(){
+  const {error} = await sb.from('ub_inventory').update({
+    quantity_total: Number(document.getElementById('invTotalUnits').value),
+    quantity_available: Number(document.getElementById('invAvailUnits').value),
+    low_stock_threshold: Number(document.getElementById('invLowStock').value),
+    landed_cost: Number(document.getElementById('invLandedCost').value),
+    updated_at: new Date().toISOString()
+  }).eq('id', inventoryCache.id);
+  if(error){ alert('Error: '+error.message); return; }
+  closeModal('inventoryModal');
+  await loadInventory();
+  renderDashboard();
+}
+
+// ---------- ORDERS ----------
+async function loadOrders(){
+  const {data, error} = await sb.from('ub_orders').select('*').order('created_at',{ascending:false});
+  if(error){ console.error(error); return; }
+  ordersCache = data || [];
+  renderOrders();
+  populateOrderDropdown();
+  renderCustomers();
+}
+
+function custName(id){ const c = customersCache.find(c=>c.id===id); return c ? c.name : '—'; }
+
+function renderOrders(){
+  const tbody = document.querySelector('#ordersTable tbody');
+  if(!ordersCache.length){ tbody.innerHTML='<tr><td colspan="8" class="empty-state">No orders yet</td></tr>'; return; }
+  tbody.innerHTML = ordersCache.map(o=>`<tr>
+    <td>${o.order_number}</td>
+    <td>${custName(o.customer_id)}</td>
+    <td>${o.channel}</td>
+    <td>${o.quantity}</td>
+    <td>$${fmt(o.total)}</td>
+    <td><span class="badge ${o.status}">${o.status}</span></td>
+    <td>${o.order_date}</td>
+    <td class="row-actions"><button class="btn small danger" onclick="deleteOrder('${o.id}')">Delete</button></td>
+  </tr>`).join('');
+}
+
+function populateOrderDropdown(){
+  document.getElementById('invOrder').innerHTML = '<option value="">— None —</option>' +
+    ordersCache.map(o=>`<option value="${o.id}">${o.order_number} — ${custName(o.customer_id)}</option>`).join('');
+}
+
+async function nextOrderNumber(){
+  const n = ordersCache.length + 1;
+  return 'UB-' + String(n).padStart(4,'0');
+}
+
+function openOrderModal(){
+  document.getElementById('orderQty').value = 1;
+  document.getElementById('orderUnitPrice').value = '';
+  document.getElementById('orderShipping').value = 0;
+  document.getElementById('orderShipMethod').value = '';
+  document.getElementById('orderStatus').value = 'pending';
+  document.getElementById('orderNotes').value = '';
+  document.getElementById('orderModal').classList.add('active');
+}
+
+async function saveOrder(){
+  const qty = Number(document.getElementById('orderQty').value);
+  const unitPrice = Number(document.getElementById('orderUnitPrice').value);
+  const shipping = Number(document.getElementById('orderShipping').value || 0);
+  if(!qty || !unitPrice){ alert('Quantity and unit price are required'); return; }
+  const total = (qty * unitPrice) + shipping;
+  const orderNumber = await nextOrderNumber();
+
+  const {error} = await sb.from('ub_orders').insert({
+    order_number: orderNumber,
+    customer_id: document.getElementById('orderCustomer').value || null,
+    channel: document.getElementById('orderChannel').value,
+    quantity: qty,
+    unit_price: unitPrice,
+    shipping_cost: shipping,
+    shipping_method: document.getElementById('orderShipMethod').value.trim() || null,
+    total: total,
+    status: document.getElementById('orderStatus').value,
+    notes: document.getElementById('orderNotes').value.trim() || null
+  });
+  if(error){ alert('Error: '+error.message); return; }
+
+  // decrement inventory
+  if(inventoryCache){
+    const newAvail = Math.max(0, inventoryCache.quantity_available - qty);
+    await sb.from('ub_inventory').update({quantity_available:newAvail, updated_at:new Date().toISOString()}).eq('id', inventoryCache.id);
+  }
+
+  closeModal('orderModal');
+  await loadInventory();
+  await loadOrders();
+  renderDashboard();
+}
+
+async function deleteOrder(id){
+  if(!confirm('Delete this order?')) return;
+  await sb.from('ub_orders').delete().eq('id', id);
+  await loadOrders();
+  renderDashboard();
+}
+
+// ---------- INVOICES ----------
+let invoicesCache = [];
+
+async function loadInvoices(){
+  const {data, error} = await sb.from('ub_invoices').select('*').order('created_at',{ascending:false});
+  if(error){ console.error(error); return; }
+  invoicesCache = data || [];
+  renderInvoices();
+}
+
+function renderInvoices(){
+  const tbody = document.querySelector('#invoicesTable tbody');
+  if(!invoicesCache.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-state">No invoices yet</td></tr>'; return; }
+  tbody.innerHTML = invoicesCache.map(inv=>`<tr>
+    <td>${inv.invoice_number}</td>
+    <td>${custName(inv.customer_id)}</td>
+    <td>$${fmt(inv.subtotal)}</td>
+    <td>$${fmt(inv.gst)}</td>
+    <td>$${fmt(inv.total)}</td>
+    <td><span class="badge ${inv.status}">${inv.status}</span></td>
+    <td>${inv.issued_date}</td>
+  </tr>`).join('');
+}
+
+function calcInvoiceTotal(){
+  const subtotal = Number(document.getElementById('invSubtotal').value || 0);
+  const gst = subtotal * 0.10;
+  document.getElementById('invGstDisplay').textContent = fmt(gst);
+  document.getElementById('invTotalDisplay').textContent = fmt(subtotal+gst);
+}
+
+function openInvoiceModal(){
+  document.getElementById('invSubtotal').value = '';
+  document.getElementById('invDueDate').value = '';
+  document.getElementById('invNotes').value = '';
+  calcInvoiceTotal();
+  document.getElementById('invoiceModal').classList.add('active');
+}
+
+async function saveInvoice(){
+  const subtotal = Number(document.getElementById('invSubtotal').value);
+  if(!subtotal){ alert('Subtotal is required'); return; }
+  const gst = subtotal * 0.10;
+  const total = subtotal + gst;
+  const invoiceNumber = 'INV-' + String(invoicesCache.length + 1).padStart(4,'0');
+
+  const {error} = await sb.from('ub_invoices').insert({
+    invoice_number: invoiceNumber,
+    customer_id: document.getElementById('invCustomer').value || null,
+    order_id: document.getElementById('invOrder').value || null,
+    subtotal, gst, total,
+    due_date: document.getElementById('invDueDate').value || null,
+    notes: document.getElementById('invNotes').value.trim() || null
+  });
+  if(error){ alert('Error: '+error.message); return; }
+  closeModal('invoiceModal');
+  await loadInvoices();
+}
+
+// ---------- DASHBOARD ----------
+function renderDashboard(){
+  const stockAvail = inventoryCache ? inventoryCache.quantity_available : 0;
+  const lowStock = inventoryCache && stockAvail <= inventoryCache.low_stock_threshold;
+
+  const now = new Date();
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate()-7);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const ordersThisWeek = ordersCache.filter(o=>new Date(o.created_at) >= weekAgo).length;
+  const revenueThisMonth = ordersCache
+    .filter(o=>new Date(o.created_at) >= monthStart && o.status !== 'cancelled')
+    .reduce((sum,o)=>sum+Number(o.total),0);
+
+  const stats = [
+    {label:'Units Available', value: stockAvail, sub: inventoryCache ? `of ${inventoryCache.quantity_total} total` : '', warn: lowStock},
+    {label:'Orders This Week', value: ordersThisWeek, sub:'last 7 days'},
+    {label:'Revenue This Month', value: '$'+fmt(revenueThisMonth), sub: now.toLocaleString('en-AU',{month:'long'})},
+    {label:'Total Customers', value: customersCache.length, sub:''}
+  ];
+
+  document.getElementById('dashStats').innerHTML = stats.map(s=>`
+    <div class="stat-card ${s.warn?'warn':''}">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-sub">${s.sub}${s.warn?' — LOW STOCK':''}</div>
+    </div>`).join('');
+
+  const recent = ordersCache.slice(0,6);
+  const tbody = document.querySelector('#dashRecentOrders tbody');
+  tbody.innerHTML = recent.length ? recent.map(o=>`<tr>
+    <td>${o.order_number}</td>
+    <td>${custName(o.customer_id)}</td>
+    <td>${o.quantity}</td>
+    <td>$${fmt(o.total)}</td>
+    <td><span class="badge ${o.status}">${o.status}</span></td>
+    <td>${o.order_date}</td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty-state">No orders yet</td></tr>';
+}
+</script>
+</body>
+</html>
